@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- 上述3个meta标签*必须*放在最前面，任何其他内容都*必须*跟随其后！ -->
+    <title>Bootstrap 101 Template</title>
+
+    <!-- Bootstrap -->
+    <link href="/static/bootstrap-3.3.7-dist/css/bootstrap.min.css" rel="stylesheet">
+
+   <script type="text/babel">
+
+       $(function (){
+           toPage(1);
+       });
+
+       function toPage(pn){
+           $.get({
+               url: "/emps",
+               data: "pn="+pn,
+               success: function(result){
+                   ReactDOM.render(<UserList users={result.extend.pageInfo.list}/>, document.getElementById("userlist"));
+                   ReactDOM.render(<PageInfo pageInfo={result.extend.pageInfo}/>, document.getElementById("pageinfo"));
+                   ReactDOM.render(<Navigation pageInfo={result.extend.pageInfo}/>, document.getElementById("navigation"));
+               },
+               dataType: "json"
+           });
+       }
+
+       /*{"code":100,"msg":"成功","extend":{"pageInfo":{"total":45,"list":[{"id":1,"name":"meizu","gender":"f","email":"meiau@gmail.com","department":{"id":1,"name":"phone"}},{"id":2,"name":"ibm","gender":"m","email":"ibm@gmail.com","department":{"id":2,"name":"computer"}},{"id":3,"name":"fb","gender":"m","email":"fb@gmail.com","department":{"id":3,"name":"data"}},{"id":4,"name":"xiaomi","gender":"m","email":"xiaomi@gmail.com","department":{"id":1,"name":"phone"}},{"id":5,"name":"huawei","gender":"m","email":"huawei@gmail.com","department":{"id":1,"name":"phone"}}],"pageNum":1,"pageSize":5,"size":5,"startRow":1,"endRow":5,"pages":9,"prePage":0,"nextPage":2,"isFirstPage":true,"isLastPage":false,"hasPreviousPage":false,"hasNextPage":true,"navigatePages":5,"navigatepageNums":[1,2,3,4,5],"navigateFirstPage":1,"navigateLastPage":5}}}*/
+
+       class UserList extends React.Component{
+           constructor(props) {
+               super(props);
+               this.update = this.update.bind(this)
+           }
+           update(id){
+               let depts;
+               $.get({
+                   url: "/depts",
+                   success: function (results) {
+                       depts=results.extend.deptInfo
+                   },
+                   dataType: "json"
+               })
+               $.get({
+                   url: "/emp/"+id,
+                   success: function (results) {
+                       ReactDOM.render(<AddModal emp={results.extend.emp} depts={depts}/>, document.getElementById("addmodal"));
+                   },
+                   dataType: "json"
+               })
+
+               $("#Modal2").modal({
+                   backdrop : "static"
+               })
+           }
+
+           render() {
+               return( <table className="table table-hover">
+                   <tbody>
+                   <tr>
+                       <th>Name</th>
+                       <th>Gender</th>
+                       <th>Email</th>
+                       <th>Department</th>
+                       <th>Operation</th>
+                   </tr>
+                   {this.props.users.map((user, index)=>{
+                       return(<tr>
+                           <td>{user.name}</td>
+                           <td>{user.gender}</td>
+                           <td>{user.email}</td>
+                           <td>{user.department.name}</td>
+                           <td>
+                               <button onClick={this.update.bind(this, user.id)} type="button" className="btn btn-primary btn-sm">
+                                   <span className="glyphicon glyphicon-pencil" aria-hidden="true"></span>
+                                   Edit
+                               </button>
+                               <button type="button" className="btn btn-danger btn-sm">
+                                   <span className="glyphicon glyphicon-trash" aria-hidden="true"></span>
+                                   Delete
+                               </button>
+                           </td>
+                       </tr>)
+                   })}
+                   </tbody>
+               </table>);
+           }
+       }
+
+
+    function PageInfo(props){
+        return(
+            <p>Currently{props.pageInfo.pageNum} page, total{props.pageInfo.pages} pages,{props.pageInfo.total} records</p>
+            );
+    }
+
+
+    class Navigation extends React.Component{
+        constructor(props) {
+            super(props);
+            this.jump = this.jump.bind(this)
+        }
+
+        jump(pageNum){
+            toPage(pageNum)
+
+        }
+
+        render(){
+            /*shang yi ye*/
+            let prePage;
+            if(this.props.pageInfo.hasPreviousPage){
+                prePage = <li><a onClick={this.jump.bind(this, this.props.pageInfo.pageNum-1)} aria-label="Previous" href="#">
+                    <span aria-hidden="true">&laquo;</span>
+                </a></li>
+            }else {
+                prePage = <li class="disabled"><a href="#"><span aria-hidden="true">&laquo;</span></a></li>
+            }
+            /*xia yi ye*/
+            let nextPage;
+            if(this.props.pageInfo.hasNextPage){
+                nextPage =  <li><a onClick={this.jump.bind(this, this.props.pageInfo.pageNum+1)} aria-label="Previous" href="#">
+                    <span aria-hidden="true">&raquo;</span>
+                </a></li>
+            }else {
+                nextPage = <li class="disabled"><a href="#"><span aria-hidden="true">&raquo;</span></a></li>
+            }
+
+            return(
+                <nav aria-label="Page navigation">
+                    <ul className="pagination">
+                        <li><a onClick={this.jump.bind(this, 1)} href="#">首页</a></li>
+                            {prePage}
+                        {this.props.pageInfo.navigatepageNums.map((pageNum)=>{
+                            return(
+                                <li class={pageNum==this.props.pageInfo.pageNum?'active':' '}><a onClick={this.jump.bind(this, pageNum)} href="#">{pageNum}</a></li >
+                            )
+                        })}
+                            {nextPage}
+                        <li><a id="lastPage " onClick={this.jump.bind(this, this.props.pageInfo.pages)} href="#">末页</a></li>
+                    </ul>
+                </nav>
+            );
+        }
+
+    }
+
+    /*点击新增按钮弹出modal
+    * 在弹出前应该发送ajax请求从数据库取出部门信息填充到department下拉列表
+    * */
+    $("#addBtn").click(function () {
+
+        $.get({
+            url: "/depts",
+            success: function (results) {
+                ReactDOM.render(<ModalContent depts={results.extend.deptInfo}/>, document.getElementById("modal"));
+            },
+            dataType: "json"
+        })
+
+        $("#myModal").modal({
+            backdrop : "static"
+        })
+    })
+
+
+       class Name extends React.Component{
+        constructor(props) {
+            super(props);
+            this.judgeName = this.judgeName.bind(this)
+        }
+
+        judgeName(){
+            let name = this.refs.addName.value
+            let regName =/^[a-zA-Z][a-zA-Z0-9_]{4,15}$/
+            if (!regName.test(name)){
+                this.props.validName(0)
+            }else{
+                this.props.validName(1)
+                let fun = this.props.nameDuplicate;
+                $.get({
+                    url: "/emp",
+                    data: "name="+name,
+                    success: function(result){
+                        if(result.extend.find){
+                            fun(true)
+                        }else {
+                            fun(false)
+                        }
+                        },
+                    dataType: "json"
+                });
+            }
+        }
+
+        render(){
+            if (this.props.submitStatus ==1){
+                this.refs.addName.val("");
+            }
+            if (this.props.nameStatus == 1 && this.props.nameRepeat == false){
+                return(
+                    <div className="form-group has-success">
+                        <label htmlFor="addName" className="col-sm-2 control-label">Name</label>
+                        <div className="col-sm-10">
+                            <input type="text" ref="addName" name="name" onBlur={this.judgeName} className="form-control"  placeholder="Name" aria-describedby="nameBlock1"/>
+                            <span id="nameBlock1" className="help-block">valid username</span>
+                        </div>
+                    </div>
+                )
+            }else if (this.props.nameStatus == 0) {
+                return (
+                    <div className="form-group has-error">
+                        <label htmlFor="addName" className="col-sm-2 control-label">Name</label>
+                        <div className="col-sm-10">
+                            <input type="text" ref="addName" name="name" onBlur={this.judgeName} className="form-control"  placeholder="Name" aria-describedby="nameBlock1"/>
+                            <span id="nameBlock1" className="help-block">username invalid</span>
+                        </div>
+                    </div>
+                )
+            }else if (this.props.nameStatus == -1){
+                return (
+                    <div className="form-group">
+                        <label htmlFor="addName" className="col-sm-2 control-label">Name</label>
+                        <div className="col-sm-10">
+                            <input type="text" ref="addName" name="name" onBlur={this.judgeName} className="form-control"  placeholder="Name" aria-describedby="nameBlock1"/>
+                        </div>
+                    </div>
+                )
+            }else {
+                return (
+                    <div className="form-group has-error">
+                        <label htmlFor="addName" className="col-sm-2 control-label">Name</label>
+                        <div className="col-sm-10">
+                            <input type="text" ref="addName" name="name" onBlur={this.judgeName} className="form-control"  placeholder="Name" aria-describedby="nameBlock1"/>
+                            <span id="nameBlock1" className="help-block">username duplicated</span>
+                        </div>
+                    </div>
+                )
+            }
+        }
+       }
+
+       class Email extends React.Component{
+        constructor(props) {
+            super(props);
+            this.handleOnblur = this.handleOnblur.bind(this);
+        }
+
+        handleOnblur(){
+            let email = this.refs.addEmail.value
+            let regEmail = /^([A-Za-z0-9_\-\.])+\@([A-Za-z0-9_\-\.])+\.([A-Za-z]{2,4})$/
+            if (!regEmail.test(email)){
+                this.props.validEmail(0)
+            }else{
+                this.props.validEmail(1)
+            }
+        }
+
+        render(){
+            if (this.props.submitStatus ==1){
+                this.refs.addEmail.val("");
+            }
+            if (this.props.emailStatus == -1){
+                return (
+                    <div className="form-group">
+                        <label htmlFor="addEmail" className="col-sm-2 control-label">Email</label>
+                        <div className="col-sm-10">
+                            <input type="email" ref="addEmail" onBlur={this.handleOnblur} name="email" className="form-control" placeholder="Email"/>
+                        </div>
+                    </div>
+                )
+            }else if (this.props.emailStatus == 1){
+                return (
+                    <div className="form-group has-success" >
+                        <label htmlFor="addEmail" className="col-sm-2 control-label">Email</label>
+                        <div className="col-sm-10">
+                            <input type="email" ref="addEmail" onBlur={this.handleOnblur} name="email" className="form-control"  placeholder="Email" aria-describedby="emailBlock1"/>
+                            <span id="emailBlock1" className="help-block">email format correct</span>
+                        </div>
+                    </div>
+                )
+            }else {
+                return (
+                    <div className="form-group has-error" >
+                        <label htmlFor="addEmail" className="col-sm-2 control-label">Email</label>
+                        <div className="col-sm-10">
+                            <input type="email" ref="addEmail" onBlur={this.handleOnblur} name="email" className="form-control"  placeholder="Email" aria-describedby="emailBlock1"/>
+                            <span id="emailBlock1" className="help-block">email format incorrect</span>
+                        </div>
+                    </div>
+                )
+            }
+        }
+
+       }
+
+       class Dept extends React.Component{
+        constructor(props) {
+            super(props);
+            this.state={
+                depts : this.props.depts
+            }
+        }
+
+        render(){
+            return(
+                <div className="form-group">
+                    <label htmlFor="addDepartment" className="col-sm-2 control-label">Department</label>
+                    <div className="col-sm-5">
+                        <select className="form-control" name="department.name">
+                            {this.state.depts.map(dept=>{
+                                return(
+                                    <option>{dept.name}</option>
+                                )
+                            })}
+                        </select>
+                    </div>
+                </div>
+            )
+        }
+       }
+
+
+       function Gender(props){
+            return(
+                <div className="form-group">
+                    <label className="col-sm-2 control-label">Gender</label>
+                    <div className="col-sm-10">
+                        <label className="radio-inline">
+                            <input type="radio" name="gender" id="addGender1" value="m" defaultChecked/>male
+                        </label>
+                        <label className="radio-inline">
+                            <input type="radio" name="gender" id="addGender2" value="f"/>female
+                        </label>
+                    </div>
+                </div>
+            )
+       }
+
+
+
+
+       class Footer extends React.Component{
+           constructor(props) {
+               super(props);
+              this.handleOnclick = this.handleOnclick.bind(this)
+           }
+           /*send ajax if valid*/
+           handleOnclick(){
+                if (this.props.nameStatus != 1 || this.props.emailStatus != 1 || this.props.nameRepeat != false){
+                    alert("please input valid number")
+                }else {
+                    $.post({
+                        url: "/emp",
+                        data:$("#myModal form").serialize(),
+                        success: function (result) {
+                            /*关闭modal*/
+                            $("#myModal").modal('hide');
+                            /*jump to last page*/
+                            toPage(999999);
+                        },
+                        dataType: "json"
+                    })
+                    this.props.submit(1);
+                }
+           }
+
+           render(){
+               return(
+                   <div className="modal-footer">
+                       <button type="button" className="btn btn-default" data-dismiss="modal">close</button>
+                       <button type="button" onClick={this.handleOnclick} className="btn btn-primary" id="saveAddBtn">save</button>
+                   </div>
+               )
+           }
+       }
+
+       class ModalContent extends React.Component{
+           constructor(props) {
+               super(props);
+               this.state={
+                   nameStatus : -1,
+                   emailStatus: -1,
+                   submitStatus: 0,
+                   nameRepeat: false
+               }
+               this.validName = this.validName.bind(this)
+               this.ValidEmail = this.ValidEmail.bind(this)
+               this.submit = this.submit.bind(this)
+               this.nameDuplicate=this.nameDuplicate.bind(this)
+           }
+           validName(isNameValid){
+               this.setState({
+                   nameStatus : isNameValid
+               })
+           }
+           ValidEmail(isEmailValid){
+               this.setState({
+                   emailStatus : isEmailValid
+               })
+           }
+
+           submit(subStatus){
+               this.setState({
+                   submitStatus: subStatus
+               })
+           }
+
+           nameDuplicate(namerepeat){
+               this.setState({
+                   nameRepeat: namerepeat
+               })
+           }
+
+
+           render() {
+               return (
+                   <div className="modal-content">
+                       <div className="modal-header">
+                           <button type="button" className="close" data-dismiss="modal" aria-label="Close"><span
+                               aria-hidden="true">&times;</span></button>
+                           <h4 className="modal-title" id="myModalLabel">add employees</h4>
+                       </div>
+                       <div className="modal-body" id="ifValid">
+                           <form className="form-horizontal">
+                               <Name validName={this.validName} nameStatus={this.state.nameStatus} submitStatus={this.state.submitStatus} nameRepeat={this.state.nameRepeat} nameDuplicate={this.nameDuplicate}/>
+                               <Email validEmail={this.ValidEmail} emailStatus={this.state.emailStatus} submitStatus={this.state.submitStatus}/>
+                               <Gender/>
+                               <Dept depts={this.props.depts}/>
+                           </form>
+                       </div>
+                       <Footer nameStatus={this.state.nameStatus} emailStatus={this.state.emailStatus} nameRepeat={this.state.nameRepeat} submit={this.submit}/>
+                   </div>
+               );
+           }
+       }
+
+       /*=============================================================================*/
+
+
+       class AddModal extends React.Component{
+           constructor(props) {
+               super(props);
+               this.state={
+                   emailStatus: -1,
+
+               }
+               this.ValidEmail = this.ValidEmail.bind(this)
+
+           }
+
+           ValidEmail(isEmailValid){
+               this.setState({
+                   emailStatus : isEmailValid
+               })
+           }
+
+
+           render() {
+               return (
+                   <div className="modal-content">
+                       <div className="modal-header">
+                           <button type="button" className="close" data-dismiss="modal" aria-label="Close"><span
+                               aria-hidden="true">&times;</span></button>
+                           <h4 className="modal-title" id="myModalLabel">edit employee</h4>
+                       </div>
+                       <div className="modal-body" id="ifValid">
+                           <form className="form-horizontal">
+                               <AddName empName={this.props.emp.name}/>
+                               <AddEmail empEmail={this.props.emp.email} emailStatus={this.state.emailStatus}/>
+                               <AddGender empGender={this.props.emp.gender}/>
+                               <AddDept depts={this.props.depts} empDepartment={this.props.emp.department}/>
+                           </form>
+                       </div>
+                       <AddFooter />
+                   </div>
+               );
+           }
+       }
+       class AddName extends React.Component{
+           constructor(props) {
+               super(props);
+           }
+           render() {
+               return (
+                   <div>
+                       <div className="form-group">
+                           <label htmlFor="addName" className="col-sm-2 control-label">Name</label>
+                           <div className="col-sm-10">
+                               <p className="form-control-static">{this.props.empName}</p>
+                           </div>
+                       </div>
+                   </div>
+               );
+           }
+       }
+       class AddEmail extends React.Component{
+           constructor(props) {
+               super(props);
+               this.handleOnblur = this.handleOnblur.bind(this)
+               this.handleOnchange=this.handleOnchange.bind(this)
+               this.state={
+                  empEmail: this.props.empEmail
+               }
+           }
+
+           handleOnblur(){
+               let email = this.refs.addEmail.value
+               let regEmail = /^([A-Za-z0-9_\-\.])+\@([A-Za-z0-9_\-\.])+\.([A-Za-z]{2,4})$/
+               if (!regEmail.test(email)){
+                   this.props.validEmail(0)
+               }else{
+                   this.props.validEmail(1)
+               }
+           }
+
+           handleOnchange(event){
+               const words = this.refs.addEmail.value
+               this.setState({
+                   empEmail : words
+               })
+           }
+
+           render(){
+               if (this.props.emailStatus == -1){
+                   return (
+                       <div className="form-group">
+                           <label htmlFor="addEmail" className="col-sm-2 control-label">Email</label>
+                           <div className="col-sm-10">
+                               <input type="email" ref="addEmail" onBlur={this.handleOnblur} name="email" onChange={this.handleOnchange} className="form-control" value={this.state.empEmail}/>
+                           </div>
+                       </div>
+                   )
+               }else if (this.props.emailStatus == 1){
+                   return (
+                       <div className="form-group has-success" >
+                           <label htmlFor="addEmail" className="col-sm-2 control-label">Email</label>
+                           <div className="col-sm-10">
+                               <input type="email" ref="addEmail" onBlur={this.handleOnblur} name="email" className="form-control"  aria-describedby="emailBlock1"/>
+                               <span id="emailBlock1" className="help-block">email format correct</span>
+                           </div>
+                       </div>
+                   )
+               }else {
+                   return (
+                       <div className="form-group has-error" >
+                           <label htmlFor="addEmail" className="col-sm-2 control-label">Email</label>
+                           <div className="col-sm-10">
+                               <input type="email" ref="addEmail" onBlur={this.handleOnblur} name="email" className="form-control"  aria-describedby="emailBlock1"/>
+                               <span id="emailBlock1" className="help-block">email format incorrect</span>
+                           </div>
+                       </div>
+                   )
+               }
+           }
+       }
+
+
+       class AddGender extends React.Component{
+        constructor(props) {
+            super(props);
+        }
+           render() {
+               return (
+                   <div className="form-group">
+                       <label className="col-sm-2 control-label">Gender</label>
+                       <div className="col-sm-10">
+                           <label className="radio-inline">
+                               <input type="radio" name="gender" id="addGender1" value="m" checked={this.props.empGender=='m'}/>male
+                           </label>
+                           <label className="radio-inline">
+                               <input type="radio" name="gender" id="addGender2" value="f" checked={this.props.empGender=='f'}/>female
+                           </label>
+                       </div>
+                   </div>
+               );
+           }
+       }
+       class AddDept extends React.Component{
+           constructor(props) {
+               super(props);
+               this.state={
+                   depts : this.props.depts
+               }
+           }
+
+           render(){
+               return(
+                   <div className="form-group">
+                       <label htmlFor="addDepartment" className="col-sm-2 control-label">Department</label>
+                       <div className="col-sm-5">
+                           <select className="form-control" name="department.name" value={this.props.empDepartment.name}>
+                               {this.state.depts.map(dept=>{
+                                   return(
+                                       <option defaultValue={dept.name}>{dept.name}</option>
+                                   )
+                               })}
+                           </select>
+                       </div>
+                   </div>
+               )
+           }
+       }
+       class AddFooter extends React.Component{
+           render() {
+               return (
+                   <div>
+
+                   </div>
+               );
+           }
+       }
+
+
+
+
+
+   </script>
+
+
+</head>
+<body>
+<div class="container">
+    <!--标题-->
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Employee management System</h1>
+        </div>
+    </div>
+    <!--按钮-->
+    <div class="row">
+        <div class="col-md-2 col-md-offset-10">
+            <!-- Button trigger modal -->
+            <button id="addBtn" type="button" class="btn btn-primary" >add</button>
+            <button type="button" class="btn btn-danger">delete</button>
+        </div>
+    </div>
+    <!--内容显示-->
+    <div class="row">
+        <div id="userlist" class="col-md-12">
+
+        </div>
+    </div>
+    <!--页面信息-->
+    <div id="pageinfo" class="col-md-6">
+       </div>
+    <!--分页-->
+    <div class="row">
+        <div id="navigation" class="col-md-6">
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+    <div class="modal-dialog" role="document" id="modal">
+
+    </div>
+</div>
+
+<!-- AddModal -->
+<div class="modal fade" id="Modal2" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+    <div class="modal-dialog" role="document" id="addmodal">
+
+    </div>
+</div>
+
+<!-- jQuery (Bootstrap 的所有 JavaScript 插件都依赖 jQuery，所以必须放在前边) -->
+<script src="/static/bootstrap-3.3.7-dist/js/JQuery.js"></script>
+<!-- 加载 Bootstrap 的所有 JavaScript 插件。你也可以根据需要只加载单个插件。 -->
+<script src="/static/bootstrap-3.3.7-dist/js/bootstrap.min.js"></script>
+<!-- 加载 React。-->
+<!-- 注意: 部署时，将 "development.js" 替换为 "production.min.js"。-->
+<script src="https://unpkg.com/react@16/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+</body>
+</html>
